@@ -80,7 +80,11 @@ def loss_function(recon_x, x, mu, logvar):
     # kl = kl_gaussian_gaussian_analytic(mu_q=?, logvar_q=?, mu_p=?, logvar_p=?).sum()
     # recon_loss = (?).sum()
     # return recon_loss + kl
-    raise notImplementedError("Implement the loss function using your functions from q1_solution.py")
+    mu_p = torch.zeros_like(mu)
+    logvar_p = torch.zeros_like(logvar)
+    kl = kl_gaussian_gaussian_analytic(mu_q=mu, logvar_q=logvar, mu_p=mu_p, logvar_p=logvar_p).sum()
+    recon_loss = -(log_likelihood_bernoulli(recon_x, x.view(-1, 784))).sum()
+    return recon_loss + kl
 
 def train(epoch):
     model.train()

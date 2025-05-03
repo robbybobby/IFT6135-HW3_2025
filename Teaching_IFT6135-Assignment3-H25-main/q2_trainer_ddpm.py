@@ -130,7 +130,8 @@ class Trainer:
             for t_ in tqdm(range(n_steps)):
                 
                 # TODO: Sample x_t 
-                raise NotImplementedError
+                t = torch.full((self.args.n_samples,), n_steps - t_ - 1, device = self.args.device, dtype=torch.long)
+                x = self.diffusion.p_sample(x, t)
             
                 if self.args.nb_save is not None and t_ in saving_steps:
                     print(f"Showing/saving samples from epoch {self.current_epoch}")
@@ -195,7 +196,8 @@ class Trainer:
         for step in tqdm(range(1, n_steps+1, 1)):
             # TODO: Generate intermediate steps
             # Hint: if GPU crashes, it might be because you accumulate unused gradient ... don't forget to remove gradient
-            raise NotImplementedError
+            t = torch.full((n_samples,), n_steps - step, device = self.args.device, dtype=torch.long)
+            x = self.diffusion.p_sample(x, t)
         
             # Store intermediate result if it's a step we want to display
             if step in steps_to_show:

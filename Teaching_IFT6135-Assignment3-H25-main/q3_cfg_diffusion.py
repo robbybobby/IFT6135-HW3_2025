@@ -32,54 +32,71 @@ class CFGDiffusion():
     def get_lambda(self, t: torch.Tensor): 
         # TODO: Write function that returns lambda_t for a specific time t. Do not forget that in the paper, lambda is built using u in [0,1]
         # Note: lambda_t must be of shape (batch_size, 1, 1, 1)
-        raise NotImplementedError
+        u = t / (self.n_steps - 1)
+        lambda_t = self.lambda_min + u*(self.lambda_max - self.lambda_min)
 
-        return lambda_t
+        return lambda_t.lambda_t.reshape(-1, 1, 1, 1)
     
     def alpha_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Alpha(lambda_t) for a specific time t according to (1)
-        raise NotImplementedError
+        var = torch.sigmoid(-lambda_t)
 
         return var.sqrt()
     
     def sigma_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Sigma(lambda_t) for a specific time t according to (1)
-        raise NotImplementedError
+        var = torch.sigmoid(lambda_t)
 
         return var.sqrt()
     
     ## Forward sampling
     def q_sample(self, x: torch.Tensor, lambda_t: torch.Tensor, noise: torch.Tensor):
         #TODO: Write function that returns z_lambda of the forward process, for a specific: x, lambda l and N(0,1) noise  according to (1)
-        raise NotImplementedError
+        alphat = self.alpha_lambda(lambda_t)
+        sigmat = self.sigma_lambda(lambda_t)
+        z_lambda_t = alphat * x + sigmat * noise
 
         return z_lambda_t
                
     def sigma_q(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor):
         #TODO: Write function that returns variance of the forward process transition distribution q(•|z_l) according to (2)
-        raise NotImplementedError
+        sigmat = self.sigma_lambda(lambda_t)
+        sigmatp = self.sigma_lambda(lambda_t_prim)
 
+        exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
+        var_q = sigmatp**2 - exp_ratio**2 * sigmat**2
     
         return var_q.sqrt()
     
     def sigma_q_x(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor):
         #TODO: Write function that returns variance of the forward process transition distribution q(•|z_l, x) according to (3)
-        raise NotImplementedError
+        alphat = self.alpha_lambda(lambda_t)
+        alphatp = self.alpha_lambda(lambda_t_prim)
 
+        exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
+        var_q_x = alphatp**2 - exp_ratio**2 * alphat**2
     
         return var_q_x.sqrt()
 
     ### REVERSE SAMPLING
     def mu_p_theta(self, z_lambda_t: torch.Tensor, x: torch.Tensor, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor):
         #TODO: Write function that returns mean of the forward process transition distribution according to (4)
-        raise NotImplementedError
+        alphatp = self.alpha_lambda(lambda_t_prim)
+        exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
 
+        first = exp_ratio * z_lambda_t
+        second = alphatp * (1 - exp_ratio**2) * x
+        mu = first + second
     
         return mu
 
     def var_p_theta(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor, v: float=0.3):
         #TODO: Write function that returns var of the forward process transition distribution according to (4)
-        raise NotImplementedError
+        sigmat = self.sigma_lambda(lambda_t)
+        sigmatp = self.sigma_lambda(lambda_t_prim)
+
+        exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
+        var = (1-v) * sigmatp**2 + v * (sigmatp**2 - exp_ratio**2 * sigmat**2)
 
         return var
     
@@ -88,8 +105,10 @@ class CFGDiffusion():
         # Note that x_t correspond to x_theta(z_lambda_t)
         if set_seed:
             torch.manual_seed(42)
-        raise NotImplementedError
-
+        mu = self.mu_p_theta(z_lambda_t, x_t, lambda_t, lambda_t_prim)
+        var = self.var_p_theta(lambda_t, lambda_t_prim)
+        eps = torch.randn_like(z_lambda_t)
+        sample = mu + torch.sqrt(var) * eps
     
         return sample 
 
@@ -105,10 +124,12 @@ class CFGDiffusion():
         if noise is None:
             noise = torch.randn_like(x0)
         #TODO: q_sample z
-        raise NotImplementedError
+        lambdat = self.get_lambda(t)
+        zt = self.q_sample(x0, lambda_t, noise)
 
         #TODO: compute loss
-        raise NotImplementedError
+        pred_noise = self.eps_model(zt, t, labels)
+        loss = F.mse_loss(pred_noise, noise, reduction = 'mean')
 
     
         return loss

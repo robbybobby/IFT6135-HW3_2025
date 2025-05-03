@@ -148,13 +148,23 @@ class Trainer:
                 t = torch.full((self.args.n_samples,), t, device=z_t.device, dtype=torch.long)
                 
                 #TODO: Get lambda and lambda prim based on t 
-                raise NotImplementedError
+                lambdat = self.diffusion.get_lambda(t)
+                if t == 0:
+                    prevt = torch.zeros_like(t)
+                else:
+                    prevt = t - 1
+                lambdat_prim = self.diffusion.get_lambda(prevt)
                 
                 #TODO: Add linear interpolation between unconditional and conditional preidiction according to 3 in Algo. 2 using cfg_scale
-                raise NotImplementedError
+                unconditional = self.eps_model(z_t, t, None)
+                conditional = self.eps_model(z_t, t, lables)
+                eps = (1+cfg_scale)*conditional - cfg_scale*unconditional
                     
                 #TODO: Get x_t then sample z_t from the reverse process according to 4. and 5. in Algo 2.
-                raise NotImplementedError
+                alphat = self.diffusion.alpha_lambda(lambdat)
+                sigmat = self.diffusion.sigma_lambda(lambdat)
+                xt = (z_t - sigmat * eps)/alphat
+                zt = self.diffusion.p_sample(z_t, lambdat, lambdat_prim, xt)
 
                 if self.args.nb_save is not None and t_ in saving_steps:
                     print(f"Showing/saving samples from epoch {self.current_epoch} with labels: {labels.tolist()}")
