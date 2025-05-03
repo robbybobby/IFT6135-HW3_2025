@@ -157,14 +157,14 @@ class Trainer:
                 
                 #TODO: Add linear interpolation between unconditional and conditional preidiction according to 3 in Algo. 2 using cfg_scale
                 unconditional = self.eps_model(z_t, t, None)
-                conditional = self.eps_model(z_t, t, lables)
+                conditional = self.eps_model(z_t, t, labels)
                 eps = (1+cfg_scale)*conditional - cfg_scale*unconditional
                     
                 #TODO: Get x_t then sample z_t from the reverse process according to 4. and 5. in Algo 2.
                 alphat = self.diffusion.alpha_lambda(lambdat)
                 sigmat = self.diffusion.sigma_lambda(lambdat)
-                xt = (z_t - sigmat * eps)/alphat
-                zt = self.diffusion.p_sample(z_t, lambdat, lambdat_prim, xt)
+                x_t = (z_t - sigmat * eps)/alphat
+                z_t = self.diffusion.p_sample(z_t, lambdat, lambdat_prim, x_t)
 
                 if self.args.nb_save is not None and t_ in saving_steps:
                     print(f"Showing/saving samples from epoch {self.current_epoch} with labels: {labels.tolist()}")
