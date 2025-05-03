@@ -125,7 +125,7 @@ class CFGDiffusion():
             noise = torch.randn_like(x0)
         #TODO: q_sample z
         lambdat = self.get_lambda(t)
-        zt = self.q_sample(x0, lambdat, noise)
+        zt = self.q_sample(x = x0, lambda_t = lambdat, noise = noise)
 
         #TODO: compute loss
         pred_noise = self.eps_model(zt, t, labels)
