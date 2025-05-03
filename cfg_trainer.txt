@@ -147,40 +147,24 @@ class Trainer:
                 t = n_steps - t_ - 1
                 t = torch.full((self.args.n_samples,), t, device=z_t.device, dtype=torch.long)
                 
-                # Get lambda_t and lambda_t_prim based on t
-                lambda_t = self.diffusion.get_lambda(t)
-                
-                # For lambda_t_prim, we need t+1 (next timestep)
-                # Handle the case where t is the last timestep
+                #TODO: Get lambda and lambda prim based on t 
+                lambdat = self.diffusion.get_lambda(t)
                 if t == 0:
-                    # For final step, we can use a larger gap for better results
-                    t_prev = torch.zeros_like(t)
+                    prevt = torch.zeros_like(t)
                 else:
-                    t_prev = t - 1
+                    prevt = t - 1
+                lambdat_prim = self.diffusion.get_lambda(prevt)
                 
-                lambda_t_prim = self.diffusion.get_lambda(t_prev)
-                
-                # Perform classifier-free guidance
-                # 1. Get unconditional prediction (without labels)
-                eps_uncond = self.eps_model(z_t, t, None)
-                
-                # 2. Get conditional prediction (with labels)
-                eps_cond = self.eps_model(z_t, t, labels)
-                
-                # 3. Perform linear interpolation between conditional and unconditional predictions
-                # eps = eps_uncond + cfg_scale * (eps_cond - eps_uncond)
-                eps = (1 + cfg_scale) * eps_cond - cfg_scale * eps_uncond
-                
-                # Calculate x_t (prediction of the original image)
-                # x_t is derived from z_t and the predicted noise
-                alpha_t = self.diffusion.alpha_lambda(lambda_t)
-                sigma_t = self.diffusion.sigma_lambda(lambda_t)
-                
-                # Rearrange equation (1) to solve for x
-                x_t = (z_t - sigma_t * eps) / alpha_t
-                
-                # Sample z_t from the reverse process
-                z_t = self.diffusion.p_sample(z_t, lambda_t, lambda_t_prim, x_t)
+                #TODO: Add linear interpolation between unconditional and conditional preidiction according to 3 in Algo. 2 using cfg_scale
+                unconditional = self.eps_model(z_t, t, None)
+                conditional = self.eps_model(z_t, t, labels)
+                eps = (1+cfg_scale)*conditional - cfg_scale*unconditional
+                    
+                #TODO: Get x_t then sample z_t from the reverse process according to 4. and 5. in Algo 2.
+                alphat = self.diffusion.alpha_lambda(lambdat)
+                sigmat = self.diffusion.sigma_lambda(lambdat)
+                x_t = (z_t - sigmat * eps)/alphat
+                z_t = self.diffusion.p_sample(z_t, lambdat, lambdat_prim, x_t)
 
                 if self.args.nb_save is not None and t_ in saving_steps:
                     print(f"Showing/saving samples from epoch {self.current_epoch} with labels: {labels.tolist()}")
