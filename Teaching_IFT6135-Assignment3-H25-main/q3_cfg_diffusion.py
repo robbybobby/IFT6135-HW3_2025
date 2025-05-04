@@ -1,4 +1,5 @@
 # %%
+from cProfile import label
 import torch
 import torch.utils.data
 import torchvision
@@ -19,8 +20,6 @@ class CFGDiffusion():
         super().__init__()
         self.eps_model = eps_model
         self.n_steps = n_steps
-        self.p_uncond = 0.1
-        self.w = 1.0
         
         self.lambda_min = -20
         self.lambda_max = 20
@@ -67,17 +66,20 @@ class CFGDiffusion():
                
     def sigma_q(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor):
         #TODO: Write function that returns variance of the forward process transition distribution q(•|z_l) according to (2)
-        sigmatp = self.sigma_lambda(lambda_t_prim)
+        sigmat = self.sigma_lambda(lambda_t)
         exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
 
-        var_q = (1 - exp_ratio) * sigmatp**2
+        var_q = (1 - exp_ratio) * sigmat**2
         var_q = torch.sqrt(var_q)
     
         return var_q
     
     def sigma_q_x(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor):
         #TODO: Write function that returns variance of the forward process transition distribution q(•|z_l, x) according to (3)
-        var_q_x = self.sigma_q(lambda_t, lambda_t_prim)
+        sogmatp = self.sigma_lambda(lambda_t_prim)
+        exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
+        var_q_x = (1 - exp_ratio) * sogmatp**2
+        var_q_x = torch.sqrt(var_q_x)
     
         return var_q_x
 
@@ -97,8 +99,8 @@ class CFGDiffusion():
     def var_p_theta(self, lambda_t: torch.Tensor, lambda_t_prim: torch.Tensor, v: float=0.3):
         #TODO: Write function that returns var of the forward process transition distribution according to (4)
         sigmaq = self.sigma_q(lambda_t, lambda_t_prim)
-        sigmaqreverse = self.sigma_q(lambda_t_prim, lambda_t)
-        var = (sigmaq ** (1 - v)) * (sigmaqreverse ** v)
+        sigmaqx = self.sigma_q_x(lambda_t, lambda_t_prim)
+        var = ((sigmaqx**2)**(1 - v)) * ((sigmaq**2) ** v)
 
         return var
     
@@ -107,15 +109,7 @@ class CFGDiffusion():
         # Note that x_t correspond to x_theta(z_lambda_t)
         if set_seed:
             torch.manual_seed(42)
-        t = lambda_t.squeeze()
-        alphat = self.alpha_lambda(lambda_t)
-        sigmat = self.sigma_lambda(lambda_t)
-        epscond = (z_lambda_t - alphat * x_t) / sigmat
-        epsuncond = self.eps_model(z_lambda_t, t, None)
-        epsguided = (1 + self.w) * epscond - self.w * epsuncond
-        nxt = (z_lambda_t - sigmat * epsguided) / alphat
-        
-        mu = self.mu_p_theta(z_lambda_t, nxt, lambda_t, lambda_t_prim)
+        mu = self.mu_p_theta(z_lambda_t, x_t, lambda_t, lambda_t_prim)
         var = self.var_p_theta(lambda_t, lambda_t_prim)
         noise = torch.randn_like(z_lambda_t)
         sample = mu + torch.sqrt(var) * noise
@@ -138,13 +132,11 @@ class CFGDiffusion():
         zt = self.q_sample(x=x0, lambda_t=lambda_t, noise=noise)
 
         #TODO: compute loss
-        uncond_mask = torch.rand(batch_size, device=x0.device) < self.p_uncond
-        labels_adjusted = torch.where(uncond_mask.view(-1, 1), torch.full_like(labels, -1), labels)
-        pred_noise = self.eps_model(zt, t, labels_adjusted)
-        pred_noise_uncond = self.eps_model(zt, t, None)
-        pred_noise = torch.where(uncond_mask.view(-1, 1, 1, 1), pred_noise_uncond, pred_noise)
-        loss = F.mse_loss(pred_noise, noise, reduction='mean')
-
+        if labels is not None:
+            noisepred = self.eps_model(zt, labels)
+        else:
+            noisepred = self.eps_model(zt, None)
+        loss = ((noisepred - noise)**2).sum(dim = dim).mean()
     
         return loss
 
