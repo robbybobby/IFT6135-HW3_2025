@@ -6,10 +6,11 @@ import copy
 import numpy as np
 
 from ddpm_utils.args import *
-from q1_train_vae import gdrive_dir
 import os
 
 torch.manual_seed(42)
+
+gdrive_dir = '../IFT6135-Assignment3/output'
 
 def one_param(m):
     "get model first parameter"
