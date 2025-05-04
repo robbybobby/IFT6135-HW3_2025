@@ -5,7 +5,9 @@ from torch.amp import GradScaler, autocast
 import copy
 import numpy as np
 
-from ddpm_utils.args import * 
+from ddpm_utils.args import *
+from q1_train_vae import gdrive_dir
+import os
 
 torch.manual_seed(42)
 
@@ -132,7 +134,7 @@ class Trainer:
                 # TODO: Sample x_t 
                 t = torch.full((self.args.n_samples,), n_steps - t_ - 1, device = self.args.device, dtype=torch.long)
                 x = self.diffusion.p_sample(x, t)
-            
+
                 if self.args.nb_save is not None and t_ in saving_steps:
                     print(f"Showing/saving samples from epoch {self.current_epoch}")
                     self.show_save(
@@ -150,7 +152,7 @@ class Trainer:
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 }, args.MODEL_PATH)
 
-    def show_save(self, img_tensor, show=True, save=True, file_name="sample.png"):
+    def show_save(self, img_tensor, show=True, save=True, gdrive_dir=gdrive_dir, file_name="sample.png"):
         fig, axs = plt.subplots(3, 3, figsize=(10, 10))  # Create a 4x4 grid of subplots
         assert img_tensor.shape[0] >= 9, "Number of images should be at least 9"
         img_tensor = img_tensor[:9]
@@ -163,7 +165,8 @@ class Trainer:
 
         plt.tight_layout()
         if save:
-            plt.savefig('images/' + file_name)
+            os.makedirs(f"{gdrive_dir}/ddpm/images", exist_ok=True)
+            plt.savefig(os.path.join(gdrive_dir, "ddpm", "images", file_name))
         if show:
             plt.show()
         plt.close(fig)
@@ -196,8 +199,9 @@ class Trainer:
         for step in tqdm(range(1, n_steps+1, 1)):
             # TODO: Generate intermediate steps
             # Hint: if GPU crashes, it might be because you accumulate unused gradient ... don't forget to remove gradient
-            t = torch.full((n_samples,), n_steps - step, device = self.args.device, dtype=torch.long)
-            x = self.diffusion.p_sample(x, t)
+            t = torch.full((n_samples,), step, device = self.args.device, dtype=torch.long)
+            with torch.no_grad():
+                x = self.diffusion.q_sample(x, t)
         
             # Store intermediate result if it's a step we want to display
             if step in steps_to_show:
