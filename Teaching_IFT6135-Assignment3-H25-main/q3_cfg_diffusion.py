@@ -32,21 +32,21 @@ class CFGDiffusion():
     def get_lambda(self, t: torch.Tensor): 
         # TODO: Write function that returns lambda_t for a specific time t. Do not forget that in the paper, lambda is built using u in [0,1]
         # Note: lambda_t must be of shape (batch_size, 1, 1, 1)
-        u = t.float() / (self.n_steps - 1)
-        lambda_t = self.lambda_min + (1-u)*(self.lambda_max - self.lambda_min)
+        u = t.float() / (self.n_steps)
+        lambda_t = self.lambda_max + (u)*(self.lambda_min - self.lambda_max)
 
-        return lambda_t.reshape(-1, 1, 1, 1)
+        return lambda_t.view(-1, 1, 1, 1)
     
     def alpha_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Alpha(lambda_t) for a specific time t according to (1)
-        var = torch.sigmoid(-lambda_t)
+        var = 1 / (1 + torch.exp(-lambda_t))
         var = torch.sqrt(var)
 
         return var
     
     def sigma_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Sigma(lambda_t) for a specific time t according to (1)
-        var = torch.sigmoid(lambda_t)
+        var = 1 - (1 / (1 + torch.exp(-lambda_t)))
         var = torch.sqrt(var)
 
         return var
@@ -96,9 +96,10 @@ class CFGDiffusion():
         #TODO: Write function that returns var of the forward process transition distribution according to (4)
         sigmat = self.sigma_lambda(lambda_t)
         sigmatp = self.sigma_lambda(lambda_t_prim)
-
         exp_ratio = self.get_exp_ratio(lambda_t, lambda_t_prim)
-        var = (1-v) * sigmatp**2 + v * (sigmatp**2 - exp_ratio**2 * sigmat**2)
+        first = (1-v) * sigmatp**2
+        second = v * (sigmatp**2 - exp_ratio**2 * sigmat**2)
+        var =  first + second
 
         return var
     
