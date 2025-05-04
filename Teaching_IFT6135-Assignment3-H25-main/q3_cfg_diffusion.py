@@ -32,22 +32,24 @@ class CFGDiffusion():
     def get_lambda(self, t: torch.Tensor): 
         # TODO: Write function that returns lambda_t for a specific time t. Do not forget that in the paper, lambda is built using u in [0,1]
         # Note: lambda_t must be of shape (batch_size, 1, 1, 1)
-        u = t / (self.n_steps - 1)
-        lambda_t = self.lambda_min + u*(self.lambda_max - self.lambda_min)
+        u = t.float() / (self.n_steps - 1)
+        lambda_t = self.lambda_min + (1-u)*(self.lambda_max - self.lambda_min)
 
         return lambda_t.reshape(-1, 1, 1, 1)
     
     def alpha_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Alpha(lambda_t) for a specific time t according to (1)
         var = torch.sigmoid(-lambda_t)
+        var = torch.sqrt(var)
 
-        return var.sqrt()
+        return var
     
     def sigma_lambda(self, lambda_t: torch.Tensor): 
         #TODO: Write function that returns Sigma(lambda_t) for a specific time t according to (1)
         var = torch.sigmoid(lambda_t)
+        var = torch.sqrt(var)
 
-        return var.sqrt()
+        return var
     
     ## Forward sampling
     def q_sample(self, x: torch.Tensor, lambda_t: torch.Tensor, noise: torch.Tensor):
